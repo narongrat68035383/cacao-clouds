@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cacao Cloud – ช็อกโกแลตแท่ง</title>
+<style>
+:root{--bg:#fffaf5;--ink:#3e2723;--card:#fff;--accent:#6d4c41;--line:#e6d9cf}
+@media (prefers-color-scheme:dark){:root{--bg:#1f1511;--ink:#f5e9e0;--card:#2b1f1a;--accent:#d7a98c;--line:#45342c}}
+*{box-sizing:border-box}body{margin:0;font-family:Tahoma,sans-serif;background:var(--bg);color:var(--ink)}
+header{text-align:center;padding:48px 16px 24px}header h1{margin:0;font-size:2.2rem;letter-spacing:1px}
+header p{margin:8px 0 0;opacity:.8}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;max-width:960px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.card img{width:100%;height:200px;object-fit:cover;background:#d7ccc8;display:block}
+.card .b{padding:14px}.card h3{margin:0 0 4px}.card p{margin:0 0 8px;font-size:.9rem;opacity:.8}
+.price{font-weight:bold;color:var(--accent);font-size:1.1rem}
+.qty{display:flex;align-items:center;gap:10px;margin-top:10px}
+.qty button{width:34px;height:34px;border-radius:50%;border:1px solid var(--accent);background:none;color:var(--ink);font-size:1.1rem}
+.order{max-width:560px;margin:8px auto 48px;padding:16px}
+.order h2{margin-top:0}input,textarea{width:100%;padding:10px;margin:4px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit}
+.total{font-size:1.2rem;font-weight:bold;margin:8px 0}
+.btn{width:100%;padding:12px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-size:1rem;font-family:inherit}
+pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px}
+</style>
+</head>
+<body>
+<header><h1>Cacao Cloud</h1><p>ช็อกโกแลตแท่งเนื้อเนียน ส่งตรงถึงบ้านคุณ</p></header>
+<div class="grid" id="grid"></div>
+<div class="order">
+  <h2>สั่งซื้อ</h2>
+  <div class="total" id="total">ยอดรวม 0 บาท</div>
+  <input id="name" placeholder="ชื่อผู้รับ">
+  <input id="phone" placeholder="เบอร์โทร" inputmode="tel">
+  <textarea id="addr" rows="3" placeholder="ที่อยู่จัดส่ง"></textarea>
+  <button class="btn" id="go">สรุปรายการสั่งซื้อ</button>
+  <pre id="out" hidden></pre>
+</div>
+<script>
+// ใส่ลิงก์ Google Sheet (File > Share > Publish to web > เลือกชีต Products > CSV) ตรงนี้
+const SHEET_CSV_URL = "";
+const FALLBACK = [
+ {sku:"CHOC-001",name:"Velvet Milk ช็อกโกแลตนม",desc:"ช็อกโกแลตนมเข้มข้น เนียนละมุน แท่ง 50 กรัม",price:59,stock:100,img:"images/milk.jpg"},
+ {sku:"CHOC-002",name:"Midnight Dark 70%",desc:"โกโก้ 70% ขมกลมกล่อม แท่ง 50 กรัม",price:69,stock:80,img:"images/dark70.jpg"},
+ {sku:"CHOC-003",name:"Snow Cream ไวท์ช็อกโกแลต",desc:"หวานมัน หอมครีม แท่ง 50 กรัม",price:65,stock:60,img:"images/white.jpg"}
+];
+let products=FALLBACK, cart={};
+function parseCSV(t){const rows=[];let r=[],c="",q=false;for(let i=0;i<t.length;i++){const ch=t[i];
+ if(q){if(ch=='"'&&t[i+1]=='"'){c+='"';i++}else if(ch=='"')q=false;else c+=ch}
+ else if(ch=='"')q=true;else if(ch==','){r.push(c);c=""}
+ else if(ch=='\n'){r.push(c);rows.push(r);r=[];c=""}else if(ch!='\r')c+=ch}
+ if(c||r.length){r.push(c);rows.push(r)}return rows}
+async function load(){
+ if(SHEET_CSV_URL){try{
+  const rows=parseCSV(await (await fetch(SHEET_CSV_URL)).text());
+  const h=rows.findIndex(r=>r[0]==="SKU");
+  const list=rows.slice(h+1).filter(r=>r[0]).map(r=>({sku:r[0],name:r[1],desc:r[2],price:+r[3],stock:+r[4],img:"images/"+r[5]}));
+  if(list.length)products=list}catch(e){console.warn("ใช้ข้อมูลสำรอง",e)}}
+ render()}
+function render(){
+ document.getElementById("grid").innerHTML=products.map(p=>`
+ <div class="card"><img src="${p.img}" alt="${p.name}" onerror="this.removeAttribute('src')">
+ <div class="b"><h3>${p.name}</h3><p>${p.desc}</p>
+ <div class="price">${p.price} บาท <small style="font-weight:normal;opacity:.7">(เหลือ ${p.stock})</small></div>
+ <div class="qty"><button onclick="chg('${p.sku}',-1)">−</button><span id="q-${p.sku}">0</span><button onclick="chg('${p.sku}',1)">+</button></div></div></div>`).join("")}
+function chg(s,d){const p=products.find(x=>x.sku===s);cart[s]=Math.max(0,Math.min(p.stock,(cart[s]||0)+d));
+ document.getElementById("q-"+s).textContent=cart[s];
+ const t=products.reduce((a,p)=>a+(cart[p.sku]||0)*p.price,0);
+ document.getElementById("total").textContent="ยอดรวม "+t.toLocaleString()+" บาท"}
+document.getElementById("go").onclick=()=>{
+ const items=products.filter(p=>cart[p.sku]).map(p=>`- ${p.name} (${p.sku}) x ${cart[p.sku]} = ${cart[p.sku]*p.price} บาท`);
+ const o=document.getElementById("out");
+ if(!items.length){o.hidden=false;o.textContent="กรุณาเลือกสินค้าอย่างน้อย 1 รายการ";return}
+ const t=products.reduce((a,p)=>a+(cart[p.sku]||0)*p.price,0);
+ o.hidden=false;o.textContent=`รายการสั่งซื้อ Cacao Cloud\n${items.join("\n")}\nรวม ${t} บาท\n\nผู้รับ: ${name.value}\nโทร: ${phone.value}\nที่อยู่: ${addr.value}`}
+load();
+</script>
+</body>
+</html>
